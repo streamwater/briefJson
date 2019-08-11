@@ -1,28 +1,28 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "briefJson.h"
+#include "briefjson.h"
 
 #define BUFFER_SIZE 1024
 
-const static wchar_t espsrc[] = L"\b\t\n\f\r\"'";
-const static wchar_t *const espdes[] = { L"\\b",L"\\t",L"\\n",L"\\f",L"\\r",L"\\\"",L"\\'" };
-const static wchar_t espuni[] = L"\\u";
+const static char espsrc[] = "\b\t\n\f\r\"'";
+const static char *const espdes[] = { "\\b","\\t","\\n","\\f","\\r","\\\"","\\'" };
+const static char espuni[] = "\\u";
 const static size_t sz_esp = sizeof(espdes) / sizeof(void *);
 
 typedef struct
 {
 	json_object data;
-	wchar_t *json;
-	wchar_t *pos;
-	wchar_t *message;
+	char *json;
+	char *pos;
+	char *message;
 }parse_engine;
 
 typedef struct string_node
 {
 	size_t size;
 	struct string_node *next;
-	wchar_t string[BUFFER_SIZE];
+	char string[BUFFER_SIZE];
 }string_node;
 
 typedef struct
@@ -32,11 +32,11 @@ typedef struct
 	string_node first;
 }string_buffer;
 
-static void buffer_append(string_buffer *buffer, const wchar_t* string, size_t length)
+static void buffer_append(string_buffer *buffer, const char* string, size_t length)
 {
 	if (!buffer->last)
 		buffer->last = &buffer->first;
-	const wchar_t *pos = string;
+	const char *pos = string;
 	while (length)
 	{
 		size_t copysize = length;
@@ -50,7 +50,7 @@ static void buffer_append(string_buffer *buffer, const wchar_t* string, size_t l
 			copynode->next = node;
 			buffer->last = node;
 		}
-		wcsncpy(copynode->string + copynode->size, pos, copysize);
+		strncpy(copynode->string + copynode->size, pos, copysize);
 		pos += copysize;
 		length -= copysize;
 		buffer->size += copysize;
@@ -58,7 +58,7 @@ static void buffer_append(string_buffer *buffer, const wchar_t* string, size_t l
 	}
 }
 
-static void buffer_addchar(string_buffer *buffer, const wchar_t ch)
+static void buffer_addchar(string_buffer *buffer, const char ch)
 {
 	if (!buffer->last)
 		buffer->last = &buffer->first;
@@ -73,19 +73,19 @@ static void buffer_addchar(string_buffer *buffer, const wchar_t ch)
 	++buffer->size;
 }
 
-static wchar_t *buffer_tostr(string_buffer *buffer)
+static char *buffer_tostr(string_buffer *buffer)
 {
-	wchar_t *string = (wchar_t *)malloc(sizeof(wchar_t)*(buffer->size + 1));
-	wchar_t *pos = string;
+	char *string = (char *)malloc(sizeof(char)*(buffer->size + 1));
+	char *pos = string;
 	string[buffer->size] = 0;
 	string_node *first = &buffer->first;
-	wcsncpy(pos, first->string, first->size);
+	strncpy(pos, first->string, first->size);
 	pos += first->size;
 	while (first->next)
 	{
 		string_node *node = first->next;
 		first->next = node->next;
-		wcsncpy(pos, node->string, node->size);
+		strncpy(pos, node->string, node->size);
 		pos += node->size;
 		free(node);
 	}
@@ -103,39 +103,39 @@ static void buffer_free(string_buffer *buffer)
 	}
 }
 
-static void string_escape(string_buffer *sb, wchar_t string[], size_t length)
+static void string_escape(string_buffer *sb, char string[], size_t length)
 {
 	for (size_t i = 0; i < length; ++i)
 	{
-		const wchar_t ch = string[i];
-		const wchar_t *posesp = wcschr(espsrc, ch);
+		const char ch = string[i];
+		const char *posesp = strchr(espsrc, ch);
 		if (posesp)
 		{
-			const wchar_t *str = espdes[posesp - espsrc];
-			buffer_append(sb, str, wcslen(str));
+			const char *str = espdes[posesp - espsrc];
+			buffer_append(sb, str, strlen(str));
 		}
 		else
 			buffer_addchar(sb, ch);
 	}
 }
 
-static wchar_t* string_revesp(wchar_t string[], wchar_t *end)
+static char* string_revesp(char string[], char *end)
 {
-	wchar_t *pos = string;
+	char *pos = string;
 	string_buffer sb = { 0 };
 	while (pos < end)
 	{
-		if (!wcsncmp(pos, espuni, 2))
+		if (!strncmp(pos, espuni, 2))
 		{
 			if (end - pos < 6) {
 				buffer_free(&sb);
 				return 0;
 			}
 			pos += 2;
-			wchar_t num = 0;
+			char num = 0;
 			for (int i = 0; i < 4; ++i)
 			{
-				wchar_t tmp = *pos++;
+				char tmp = *pos++;
 				if (tmp >= '0'&&tmp <= '9')
 					tmp = tmp - '0';
 				else if (tmp >= 'A'&&tmp <= 'F')
@@ -150,8 +150,8 @@ static wchar_t* string_revesp(wchar_t string[], wchar_t *end)
 		size_t i = 0;
 		for (; i < sz_esp; ++i)
 		{
-			size_t len = wcslen(espdes[i]);
-			if (!wcsncmp(pos, espdes[i], len))
+			size_t len = strlen(espdes[i]);
+			if (!strncmp(pos, espdes[i], len))
 			{
 				buffer_addchar(&sb, espsrc[i]);
 				pos += len;
@@ -164,15 +164,15 @@ static wchar_t* string_revesp(wchar_t string[], wchar_t *end)
 	return buffer_tostr(&sb);
 }
 
-static json_object* insert_item(json_object *list, wchar_t *key)
+static json_object* insert_item(json_object *list, char *key)
 {
 	json_object *item;
 	size_t len = 0;
 	if (key)
 	{
-		len = wcslen(key);
-		item = (json_object *)malloc(sizeof(json_object) + sizeof(wchar_t)*len);
-		wcsncpy(item->key, key, len);
+		len = strlen(key);
+		item = (json_object *)malloc(sizeof(json_object) + sizeof(char)*len);
+		strncpy(item->key, key, len);
 	}
 	else item = (json_object *)malloc(sizeof(json_object));
 	item->type = NONE;
@@ -198,19 +198,19 @@ static json_object* insert_item(json_object *list, wchar_t *key)
 	return item;
 }
 
-static wchar_t next_token(parse_engine* engine) {
-	wchar_t ch;
+static char next_token(parse_engine* engine) {
+	char ch;
 	while ((ch = *engine->pos++) <= ' '&&ch>0);
 	return *(engine->pos - 1);
 }
 
 static int parsing(parse_engine* engine, json_object *pos_parse)
 {
-	wchar_t c = next_token(engine);
+	char c = next_token(engine);
 	switch (c)
 	{
 	case 0:
-		engine->message = (wchar_t *)L"Unexpected end";
+		engine->message = (char *)"Unexpected end";
 		return 1;
 
 	case '[':
@@ -242,7 +242,7 @@ static int parsing(parse_engine* engine, json_object *pos_parse)
 			case ']':
 				return 0;
 			default:
-				engine->message = (wchar_t *)L":Expected a ',' or ']'";
+				engine->message = (char *)":Expected a ',' or ']'";
 				return 1;
 			}
 		}
@@ -260,12 +260,12 @@ static int parsing(parse_engine* engine, json_object *pos_parse)
 			if (parsing(engine, &key) || key.type != TEXT)
 			{
 				json_object_free(&key);
-				engine->message = (wchar_t *)L"Illegal key of pair";
+				engine->message = (char *)"Illegal key of pair";
 				return 1;
 			}
 			if (next_token(engine) != ':')
 			{
-				engine->message = (wchar_t *)L"Expected a ':'";
+				engine->message = (char *)"Expected a ':'";
 				return 1;
 			}
 			json_object* item = insert_item(pos_parse, key.value.text);
@@ -285,7 +285,7 @@ static int parsing(parse_engine* engine, json_object *pos_parse)
 			case '}':
 				return 0;
 			default:
-				engine->message = (wchar_t *)L"Expected a ',' or '}'";
+				engine->message = (char *)"Expected a ',' or '}'";
 				return 1;
 			}
 		}
@@ -294,12 +294,12 @@ static int parsing(parse_engine* engine, json_object *pos_parse)
 	case '\'':
 	case '"':
 	{
-		wchar_t *start = engine->pos;
+		char *start = engine->pos;
 		while (*engine->pos != c)
 		{
 			engine->pos += *engine->pos == '\\';
 			if (!*engine->pos++) {
-				engine->message = (wchar_t *)L"Unterminated string";
+				engine->message = (char *)"Unterminated string";
 				return 1;
 			}
 		}
@@ -308,33 +308,33 @@ static int parsing(parse_engine* engine, json_object *pos_parse)
 		return !pos_parse->value.text;
 	}
 	}
-	wchar_t *start = engine->pos - 1;
+	char *start = engine->pos - 1;
 	while (c >= ' ') {
 		if (strchr(",:]}/\"[{;=#", c))
 			break;
 		c = *engine->pos++;
 	}
-	wchar_t *string = string_revesp(start, --engine->pos);
+	char *string = string_revesp(start, --engine->pos);
 	if (!string) return 1;
-	if (!wcscmp(string, L"TRUE") || !wcscmp(string, L"true"))
+	if (!strcmp(string, "TRUE") || !strcmp(string, "true"))
 	{
 		pos_parse->type = BOOLEAN;
 		pos_parse->value.boolean = true;
 	}
-	else if (!wcscmp(string, L"FALSE") || !wcscmp(string, L"false"))
+	else if (!strcmp(string, "FALSE") || !strcmp(string, "false"))
 	{
 		pos_parse->type = BOOLEAN;
 		pos_parse->value.boolean = false;
 	}
-	else if (!wcscmp(string, L"NULL") || !wcscmp(string, L"null"))
+	else if (!strcmp(string, "NUL") || !strcmp(string, "nul"))
 	{
 		pos_parse->type = NONE;
 	}
 	else
 	{
-		pos_parse->type = (wcschr(string, L'.') || wcschr(string, L'e') || wcschr(string, L'E')) ? DECIMAL : INTEGER;
-		const wchar_t *format = pos_parse->type == INTEGER ? L"%lld" : L"%lf";
-		if (!swscanf(string, format, &pos_parse->value))
+		pos_parse->type = (strchr(string, '.') || strchr(string, 'e') || strchr(string, 'E')) ? DECIMAL : INTEGER;
+		const char *format = pos_parse->type == INTEGER ? "%lld" : "%lf";
+		if (!sscanf(string, format, &pos_parse->value))
 		{
 			pos_parse->type = TEXT;
 			pos_parse->value.text = string;
@@ -350,33 +350,33 @@ static void object_to_string(json_object *data, string_buffer *sb)
 	switch (data->type) {
 	case NONE:
 	{
-		buffer_append(sb, L"null", 4);
+		buffer_append(sb, "nul", 4);
 		break;
 	}
 	case INTEGER:
 	case DECIMAL:
 	{
-		wchar_t buffer[32] = { 0 };
+		char buffer[32] = { 0 };
 		if (data->type == INTEGER)
-			swprintf(buffer, sizeof(buffer), L"%lld", data->value.integer);
+			snprintf(buffer, sizeof(buffer), "%lld", data->value.integer);
 		else
-			swprintf(buffer, sizeof(buffer), L"%lf", data->value.decimal);
-		buffer_append(sb, buffer, wcslen(buffer));
+			snprintf(buffer, sizeof(buffer), "%lf", data->value.decimal);
+		buffer_append(sb, buffer, strlen(buffer));
 		break;
 	}
 	case BOOLEAN:
 	{
 		if (data->value.boolean)
-			buffer_append(sb, L"true", 4);
+			buffer_append(sb, "true", 4);
 		else
-			buffer_append(sb, L"false", 5);
+			buffer_append(sb, "false", 5);
 		break;
 	}
 	case TEXT:
 	{
-		buffer_addchar(sb, L'"');
-		string_escape(sb, data->value.text, wcslen(data->value.text));
-		buffer_addchar(sb, L'"');
+		buffer_addchar(sb, '"');
+		string_escape(sb, data->value.text, strlen(data->value.text));
+		buffer_addchar(sb, '"');
 		break;
 	}
 	case TABLE:
@@ -385,18 +385,18 @@ static void object_to_string(json_object *data, string_buffer *sb)
 		int index = 0;
 		while (item)
 		{
-			if (index) buffer_addchar(sb, L',');
-			else buffer_addchar(sb, L'{');
+			if (index) buffer_addchar(sb, ',');
+			else buffer_addchar(sb, '{');
 			json_object key;
 			key.type = TEXT;
 			key.value.text = item->key;
 			object_to_string(&key, sb);
-			buffer_addchar(sb, L':');
+			buffer_addchar(sb, ':');
 			object_to_string(item, sb);
 			item = item->next;
 			++index;
 		}
-		buffer_addchar(sb, L'}');
+		buffer_addchar(sb, '}');
 		break;
 	}
 	case ARRAY:
@@ -405,18 +405,18 @@ static void object_to_string(json_object *data, string_buffer *sb)
 		int index = 0;
 		while (item)
 		{
-			buffer_addchar(sb, index ? L',' : L'[');
+			buffer_addchar(sb, index ? ',' : '[');
 			object_to_string(item, sb);
 			item = item->next;
 			++index;
 		}
-		buffer_addchar(sb, L']');
+		buffer_addchar(sb, ']');
 		break;
 	}
 	}
 }
 
-json_object json_parse(wchar_t json[], wchar_t **message, long* error_pos)
+json_object json_parse(char json[], char **message, long* error_pos)
 {
 	parse_engine result;
 	result.data.type = NONE;
@@ -431,16 +431,16 @@ json_object json_parse(wchar_t json[], wchar_t **message, long* error_pos)
 		null_item.type = NONE;
 		return null_item;
 	}
-	if (message)	*message = (wchar_t *)L"SUCCEED";
+	if (message)	*message = (char *)"SUCCEED";
 	if (error_pos) *error_pos = 0;
 	return result.data;
 }
 
-wchar_t *json_serialize(json_object *data)
+char *json_serialize(json_object *data)
 {
 	string_buffer head = { 0 };
 	object_to_string(data, &head);
-	wchar_t *string = buffer_tostr(&head);
+	char *string = buffer_tostr(&head);
 	return string;
 }
 
@@ -458,7 +458,7 @@ void json_object_free(json_object *data)
 		free(data->value.text);
 }
 
-void json_text_free(wchar_t json[])
+void json_text_free(char json[])
 {
 	free(json);
 }
