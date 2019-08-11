@@ -28,4 +28,21 @@ void json_text_free(char json[]);	//free the memory of json text created by json
 json_object json_parse(char json[], char **message, long* error_pos);//parse json text to json object
 char *json_serialize(json_object* data);//serialize json object to json text
 
+bool json_obj2boolean(json_object *data, bool deft);
+long long json_obj2integer(json_object *data, long long deft);
+double json_obj2decimal(json_object *data, double deft);
+char* json_obj2text(json_object *data, char *deft);
+bool json_has_key(json_object *data, const char *key);
+
+json_type json_get_obj_type(json_object *data);
+
+json_object* json_get_value(json_object *data, const char *key);
+bool json_get_boolean(json_object *data, const char *key, bool deft);
+long long json_get_integer(json_object *data, const char *key, long long deft);
+double json_get_decimal(json_object *data, const char *key, double deft);
+char* json_get_text(json_object *data, const char *key, char* deft);
+
+int json_get_array_size(json_object *arr_data);
+json_object* json_get_array_element(json_object *arr_data, int index);
+
 #endif // BRIEFJSON_H

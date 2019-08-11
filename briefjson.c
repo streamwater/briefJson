@@ -462,3 +462,101 @@ void json_text_free(char json[])
 {
 	free(json);
 }
+
+
+bool json_obj2boolean(json_object *data, bool deft) {
+	return NULL == data ? deft : data->value.boolean;
+}
+
+long long json_obj2integer(json_object *data, long long deft) {
+	return NULL == data ? deft : data->value.integer;
+}
+
+double json_obj2decimal(json_object *data, double deft) {
+	return NULL == data ? deft : data->value.decimal;
+}
+
+char* json_obj2text(json_object *data, char *deft) {
+	return NULL == data ? deft : data->value.text;
+}
+
+bool json_has_key(json_object *data, const char *key) {
+	if (data->type == TABLE) {
+		json_object *item = (json_object *)data->value.item;
+		while (item)
+		{
+			if (0 == strcmp((const char* )item->key, key)) {
+				return true;
+			}
+			item = item->next;
+		}
+	}
+	return false;
+}
+
+json_type json_get_obj_type(json_object *data) {
+	return data->type;
+}
+
+json_object* json_get_value(json_object *data, const char *key) {
+	if (data->type == TABLE) {
+		json_object *item = (json_object *)data->value.item;
+		while (item) {
+			if (0 == strcmp((const char* )item->key, key)) {
+				return item;
+			}
+			item = item->next;
+		}
+	}
+	return NULL;
+}
+
+bool json_get_boolean(json_object *data, const char *key, bool deft) {
+	json_object *value = json_get_value(data, key);
+	return NULL == value ? deft : json_obj2boolean(value, deft);
+}
+
+long long json_get_integer(json_object *data, const char *key, long long deft) {
+	json_object *value = json_get_value(data, key);
+	return NULL == value ? deft : json_obj2integer(value, deft);
+}
+
+double json_get_decimal(json_object *data, const char *key, double deft) {
+	json_object *value = json_get_value(data, key);
+	return NULL == value ? deft : json_obj2decimal(value, deft);
+}
+
+char* json_get_text(json_object *data, const char *key, char* deft) {
+	json_object *value = json_get_value(data, key);
+	return NULL == value ? deft : json_obj2text(value, deft);
+}
+
+int json_get_array_size(json_object *arr_data) {
+	int size = 0;
+
+	if (arr_data->type == ARRAY) {
+		json_object *item = (json_object *)arr_data->value.item;
+
+		while (item) {
+			item = item->next;
+			size++;
+		}
+	}
+	return size;
+}
+
+json_object* json_get_array_element(json_object *arr_data, int index) {
+	if (arr_data->type == ARRAY) {
+		json_object *item = (json_object *)arr_data->value.item;
+		int i = 0;
+
+		while (item) {
+			if (i == index) {
+				return item;
+			}
+			item = item->next;
+			i++;
+		}
+	}
+	return NULL;
+}
